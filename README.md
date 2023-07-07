@@ -8,21 +8,21 @@ To use the program, run file:&emsp;<b>chat.py</b>
 > for ex. using&ensp;`python3 chat.py`
 
 ## User Manual
-&ensp;`Numbers` Navigate in app.
+&ensp;`Numbers`&ensp; Navigate in app.
 
-&ensp;`T` Type.
+&ensp;`T`&ensp; Type.
 
-&ensp;`W` Scroll chat up.
+&ensp;`W`&ensp; Scroll chat up.
 
-&ensp;`S` Scroll chat down.
+&ensp;`S`&ensp; Scroll chat down.
 
-&ensp;`A` Add new user to chat.
+&ensp;`A`&ensp; Add new user to chat.
 
-&ensp;`D` Delete user from chat.
+&ensp;`D`&ensp; Delete user from chat.
 
-&ensp;`R` Remove chat.
+&ensp;`R`&ensp; Remove chat.
 
-&ensp;`Q` Go back.
+&ensp;`Q`&ensp; Go back.
 
 
 @Michał Nowakowski - 2023

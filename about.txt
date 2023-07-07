@@ -1,0 +1,11 @@
+   Terminal-chat is light chat communicator that can be hosted on MySQL Databases.
+  You can use it "worldwide" by using shared online database.
+
+  Also, you can use chat "inside". By hosting app on MySQL Database not shared online,
+  you will have 100% privacy, because data won't go out from the private network.
+
+  It may be good option for simple chatting inside company / corporation.
+
+  Enjoy using it!
+
+  @Michał Nowakowski - 2023

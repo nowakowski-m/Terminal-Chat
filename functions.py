@@ -1,7 +1,9 @@
 # Terminal-chat functions file.
 
+from getpass import getpass
 import mysql.connector
 import termios
+import random
 import select
 import time
 import sys
@@ -45,8 +47,11 @@ def connect_to_db(host, user, password):
 
 class App:
 
-    def __init__(self, cursor):
-        self.cursor = cursor
+    def __init__(self, mydb):
+        # Usage:       USE Database
+        self.mydb = mydb
+        self.cursor = self.mydb.cursor()
+        self.cursor.execute("USE chat;")
         self.in_chat = False
         self.break_loop = False
         self.scrolled_up = 0
@@ -125,13 +130,20 @@ class App:
                         case "q":
                             self.chats_list()
                         case "w":
-                            if self.scrolled_up < self.messages_amount - int(self.height) + 11:
+                            if self.scrolled_up < self.messages_amount - int(self.height) + 10:
                                 self.scrolled_up += 1
                         case "s":
                             if self.scrolled_up > 0:
                                 self.scrolled_up -= 1
-                        case "a":
-                            self.add_user_to_chat(self.chat_choosen)
+                    
+                    if self.user_id == self.find_chat_creator():
+                        match key.lower():    
+                            case "a":
+                                self.add_user_to_chat(self.chat_choosen)
+                            case "d":
+                                self.delete_user_from_chat()
+                            case "r":
+                                self.remove_chat()
                 
     # SQL QUERIES SECTION
 
@@ -190,6 +202,10 @@ class App:
         
         return -2
 
+    def find_chat_creator(self) -> int:
+        self.cursor.execute(f"SELECT created_by FROM chats WHERE chat_id = {self.chat_choosen}")
+        return self.cursor.fetchone()[0]
+    
     def register_user(self, username, password):
         self.cursor.execute(f"INSERT INTO `chat`.`users` (`username`, `password`, `is_online`, `unregistered`) VALUES ('{username}', '{password}', 0, 0);")
 
@@ -200,18 +216,45 @@ class App:
         self.cursor.execute(f"INSERT INTO `chat`.`chats` (`chat_name`, `created_by`) VALUES ('{chat_name}', '{user_id}');")
 
     def insert_user_to_chat(self, chat_id, user_id):
-        self.cursor.execute(f"INSERT INTO `chat`.`chats_users` (`chat_id`, `user_id`) VALUES ('{chat_id}', '{user_id}');")
+        if self.was_user_in_chat(user_id):
+            self.cursor.execute(f"UPDATE chats_users SET user_in_chat = 1 WHERE user_id = {user_id};")
+        else:
+            self.cursor.execute(f"INSERT INTO `chat`.`chats_users` (`chat_id`, `user_id`, `user_in_chat`) VALUES ('{chat_id}', '{user_id}', 1);")
     
+    def remove_user_from_chat(self, user_id):
+        self.cursor.execute(f"UPDATE chats_users SET user_in_chat = 0 WHERE user_id = {user_id};")
+        
+    def was_user_in_chat(self, user_id):
+        self.cursor.execute(f"SELECT chat_id FROM chats_users WHERE user_id = {user_id} AND user_in_chat = 0;")
+        result = self.cursor.fetchall()
+        if result:
+            for res in result:
+                if str(res[0]) == str(self.chat_choosen):
+                    return True
+        return False
+
+    
+    def is_user_in_chat(self, user_id):
+        self.cursor.execute(f"SELECT chat_id FROM chats_users WHERE user_id = {user_id} AND user_in_chat = 1;")
+        result = self.cursor.fetchall()
+        if result:
+            for res in result:
+                if str(res[0]) == str(self.chat_choosen):
+                    return True
+        return False
+
     def find_my_chats_ids(self) -> int:
-        self.cursor.execute(f"SELECT chat_id FROM chats_users WHERE user_id = '{self.user_id}';")
+        self.cursor.execute(f"SELECT chat_id FROM chats_users WHERE user_id = '{self.user_id}' AND user_in_chat = 1;")
         chats_ids = [int(x[0]) for x in self.cursor.fetchall()]
         return chats_ids
 
     def find_chats(self) -> list:
         chats = []
-        for chat_id in self.find_my_chats_ids():
-            self.cursor.execute(f"SELECT * FROM chats WHERE chat_id = {chat_id};")
-            chats.append([str(x) for x in self.cursor.fetchone()])
+        my_chats_ids = self.find_my_chats_ids()
+        if len(my_chats_ids) != 0:
+            for chat_id in my_chats_ids:
+                self.cursor.execute(f"SELECT * FROM chats WHERE chat_id = {chat_id};")
+                chats.append([str(x) for x in self.cursor.fetchone()])
 
         return chats
 
@@ -232,6 +275,13 @@ class App:
 
         return True, real_chat_id
 
+    def delete_chat(self):
+        query = f"""
+        DELETE FROM messages WHERE chat_id = {self.chat_choosen};
+        DELETE FROM chats_users WHERE chat_id = {self.chat_choosen};
+        DELETE FROM chats WHERE chat_id = {self.chat_choosen};"""
+        self.cursor.execute(query)
+    
     def insert_message_to_chat(self, message):
         self.cursor.execute(f"INSERT INTO messages (chat_id, sender_id, content, timestamp) VALUES ({self.chat_choosen}, {self.user_id}, '{message}', NOW());")
 
@@ -265,7 +315,7 @@ class App:
         os.system("clear")
         print(self.text_box("Log in"))
         self.username = input("   Input username: ")
-        password = input("   Input password: ")
+        password = getpass("   Input password: ")
         print("   Remember me? (y/n): ")
         remember_me = get_key()
 
@@ -305,11 +355,11 @@ class App:
                 key = get_key()
 
             if (str(key)).lower() == "y" or auto == 'y':
-                self.user_id = (-1)
                 self.logged_in = False
                 self.remember_me = False
                 self.set_user_offline()
-
+                self.user_id = (-1)
+                
                 try:
                     with open("user.id", "r") as f:
                         os.remove("user.id")
@@ -320,7 +370,7 @@ class App:
         os.system("clear")
         print(self.text_box("Registration"))
         username = input("   Input username: ")
-        password = input("   Input password: ")
+        password = getpass("   Input password: ")
         already_exists = False
 
         try:
@@ -365,14 +415,13 @@ class App:
     def chats_list(self):
         os.system("clear")
         print(self.text_box(f"Your chats."))
-        self.in_chat = False
-        not_number = False
+        self.in_chat, not_number, dont_do_rest = False, False, False
         chats = self.find_chats()
         print(f"   1. Create a new chat.\n")
         for index, chat in enumerate(chats):
             print(f'   {index + 2}. {self.format_chat_list(chat)}')
         
-        option = get_key()
+        option = get_key(timeout=0.5)
 
         try:
             int(option)
@@ -380,24 +429,29 @@ class App:
             not_number = True
             if option == "q":
                 self.menu()
+                dont_do_rest = True
             else:
                 self.chats_list()
 
-        if option == "1":
-            self.create_new_chat()
-        elif not not_number:
-            if 1 < int(option) <= len(chats) + 1:
-                self.chat_choosen = (chats[int(option) - 2][0])
-                self.in_chat = True
-        else:
-            print('Wrong option chosen.')
+        if not dont_do_rest:
+            if option == "1":
+                self.create_new_chat()
+            elif not not_number:
+                if 1 < int(option) <= len(chats) + 1:
+                    self.chat_choosen = (chats[int(option) - 2][0])
+                    self.in_chat = True
+            else:
+                print('Wrong option chosen.')
             
     def print_chat(self):
         os.system("clear")
-        print(self.text_box(f"{self.find_chat_name_by_id(self.chat_choosen)}"))
-        print(f"   Users Online: {self.chat_users_online()}\n")
-        for message in self.list_messages():
-            print(self.format_message(message))
+        try:
+            print(self.text_box(f"{self.find_chat_name_by_id(self.chat_choosen)}"))
+            print(f"   Users Online: {self.chat_users_online()}\n")
+            for message in self.list_messages():
+                print(self.format_message(message))
+        except:
+            self.chats_list()
 
     def input_message(self):
             message = str(input("\nType: "))
@@ -409,19 +463,42 @@ class App:
                     time.sleep(0.8)
 
     def add_user_to_chat(self, chat_id):
-        username = str(input("Input username to add: "))
+        username = str(input("\nInput username to add: "))
         self.cursor.fetchall()
         user_id = self.find_id_by_name(username)
-        if user_id == (-2):
-            print("User doesn't exist.")
-        else:
-            try:
-                self.insert_user_to_chat(chat_id, user_id)
-                print("User added succesfully.")
-            # except mysql.connector.custom_error_exception(): #duplicated key primary
-                # print("User is already member of this chat.")
-            except:
-                print("Something went wrong.")
+        in_chat = self.is_user_in_chat(user_id)
+        if in_chat:
+            print("User is already member of this chat.")
+        else:    
+            if user_id == (-2):
+                print("User doesn't exist.")
+            elif user_id == self.user_id:
+                print("Can't add yourself.")
+            else:
+                try:
+                    self.insert_user_to_chat(chat_id, user_id)
+                    print("User added succesfully.")
+                except:
+                    print("Something went wrong.")
+
+        time.sleep(0.8)
+
+    def delete_user_from_chat(self):
+        username = str(input("\nInput username to delete: "))
+        user_id = self.find_id_by_name(username)
+        in_chat = self.is_user_in_chat(user_id)
+        was_in_chat = self.was_user_in_chat(user_id)
+        try:
+            if in_chat:
+                if not was_in_chat:
+                    self.remove_user_from_chat(user_id)
+                    print(f"User deleted succesfully.")
+                else:
+                    print(f"User already deleted.")
+            elif not in_chat:
+                print(f"User's not a member of chat.")
+        except:
+            print(f"Something went wrong.")
 
         time.sleep(0.8)
 
@@ -450,6 +527,31 @@ class App:
         time.sleep(0.8)
         self.chats_list()
 
+    def remove_chat(self):
+        os.system("clear")
+        print(f'{self.text_box("Removing chat.")}')
+        print(f"Are you sure you want to remove this chat?")
+        print(f"This operation is irreversible! (y/n): ")
+        key = get_key()
+        if str(key).lower() == "y":
+            code = int(round(random.random()*100000000))
+            users_code = int(input(f"Repeat the code ({code}): "))
+            if code == users_code:
+                try:
+                    self.delete_chat()
+                    print(f'\nSuccesfully removed chat!')
+                    self.in_chat = False
+                    self.cursor.close()
+                    self.mydb.reconnect()
+                    self.cursor = self.mydb.cursor()
+                    self.cursor.execute("USE chat;")
+                except:
+                    print(f"\nUps, something went wrong. :(")
+            else:
+                print(f"\nWrong code given.\nStopped removing chat.")
+
+        time.sleep(0.8)
+    
     def exit_app(self):
         self.break_loop = True
         self.set_user_offline()

@@ -24,5 +24,8 @@ To use the program, run file:&emsp;<b>chat.py</b>
 
 &ensp;`Q`&ensp; Go back.
 
+## Tips
+If you want to quit typing, just leave input field empty. The same you can do with every input field exists in app, at most it will return an error that there is no user, wrong password, etc.
 
+Have fun while using!
 @Michał Nowakowski - 2023

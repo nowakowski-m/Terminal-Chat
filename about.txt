@@ -6,6 +6,11 @@
 
   It may be good option for simple chatting inside company / corporation.
 
+  App allows to create private and group chats. Also adding and removing users from them,
+  with keeping messages history.
+
+  Keep in mind that unregistering account makes it never reacheable again.
+
   Enjoy using it!
 
   @Michał Nowakowski - 2023
